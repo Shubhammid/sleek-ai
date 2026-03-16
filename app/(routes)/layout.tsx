@@ -1,3 +1,5 @@
+import Header from "@/components/header";
+
 export default function HomeLayout({
   children,
 }: Readonly<{
@@ -5,6 +7,7 @@ export default function HomeLayout({
 }>) {
   return (
     <main>
+      <Header />
       <div className="overflow-hidden">{children}</div>
     </main>
   );
