@@ -24,9 +24,7 @@ const CanvasControls = ({
     <div
       className="absolute bottom-10 -translate-x-1/2
       left-1/2 flex items-center gap-2 rounded-full border
-      bg-card py-1.5 px-4 shadow-md text-foreground
-      "
-    >
+      bg-card py-1.5 px-4 shadow-md text-foreground">
 
       <div className='flex items-center gap-1'>
         <Button
@@ -60,6 +58,7 @@ const CanvasControls = ({
       </div>
 
       <Separator orientation="vertical" className="h-5!" />
+
       <div className="flex items-center gap-1">
         <Button
           size="icon-sm"
