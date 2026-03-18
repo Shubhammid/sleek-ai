@@ -11,6 +11,7 @@ import NewProjectChat from "./new-project-chat";
 import { Button } from "../ui/button";
 import { ArrowLeft } from "lucide-react";
 import ChatPanel from "./chat-panel";
+import Canvas from "./canvas";
 
 type PropsType = {
   isProjectPage?: boolean;
@@ -151,7 +152,9 @@ const ChatInterface = ({
         />
       </div>
       <div className="flex-1">
-        Canvas
+        <Canvas
+          
+        />
       </div>
     </div>
   );
