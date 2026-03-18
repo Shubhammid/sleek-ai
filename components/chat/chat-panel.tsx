@@ -1,5 +1,4 @@
 import { ChatStatus, UIMessage } from "ai";
-import React from "react";
 import { PromptInputMessage } from "../ai-elements/prompt-input";
 import {
   Conversation,
@@ -18,6 +17,10 @@ import {
   AttachmentPreview,
   Attachments,
 } from "../ai-elements/attachments";
+import { AlertCircleIcon, CheckCircle2, Circle } from "lucide-react";
+import { Spinner } from "../ui/spinner";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { Loader } from "../ui/loader";
 
 type PropsType = {
   className?: string;
@@ -94,6 +97,16 @@ const ChatPanel = ({
                                 <MessageResponse>{part.text}</MessageResponse>
                               </div>
                             );
+
+                          case "data-generation":
+                            const data = (part as any).data;
+                            return (
+                              <GenerationCard
+                                key={`${message.id}-gen-${i}`}
+                                //status={data.status}
+                              />
+                            );
+
                           default:
                             return null;
                         }
@@ -103,6 +116,19 @@ const ChatPanel = ({
                 </>
               );
             })
+          )}
+
+          {isLoading ? (
+            <div className="px-2">
+              <Loader />
+            </div>
+          ) : null}
+          
+          {status === "error" && error && (
+            <ErrorAlert
+              title="Chat Error"
+              message={"Something went wrong"}
+            />
           )}
         </ConversationContent>
       </Conversation>
@@ -120,5 +146,108 @@ const ChatPanel = ({
     </div>
   );
 };
+
+const ErrorAlert = ({ title, message }: {
+  title: string;
+  message: string;
+}) => {
+  return (
+    <>
+      <Alert
+        variant="destructive"
+        className="w-full"
+      >
+        <AlertCircleIcon className="h-4 w-4" />
+        <div>
+          <AlertTitle>{title}</AlertTitle>
+          <AlertDescription>
+            {message}
+          </AlertDescription>
+        </div>
+      </Alert>
+    </>
+  )
+}
+
+
+const GenerationCard = ({
+  status,
+  pages,
+  currentPageId,
+  regeneratePage
+}: {
+  status: 'analyzing' | 'generating' | 'regenerating' | 'canceled' | 'complete' | 'error';
+  pages: { id: string, name: string, done: boolean }[]
+  regeneratePage: { id: string, name: string, done: boolean }
+  currentPageId?: string
+}) => {
+  const isComplete = status === "complete";
+  const isAnalyzing = status === "analyzing";
+  const isCanceled = status === "canceled";
+  const isError = status === "error";
+  const isRegenerating = status === "regenerating"
+  return (
+    <div className={`mx-2 my-2 rounded-xl border p-4 flex flex-col
+    gap-3 shadow-sm animate-in fade-in slide-in-from-bottom-2
+    ${isError
+        ? 'border-destructive/30 bg-destructive/5'
+        : 'border-border bg-card'
+      }`}>
+      <div className="flex items-center gap-2 text-sm font-medium">
+        {isComplete ? (
+          <CheckCircle2 className="size-4 text-green-500 shrink-0" />
+        ) : isCanceled ? (
+          <AlertCircleIcon className="size-4 text-destructive shrink-0" />
+        ) : isError ? (
+          <AlertCircleIcon className="size-4 text-destructive shrink-0" />
+        ) : (
+          <Spinner className="size-4 shrink-0" />
+        )}
+        <span className={isError ? 'text-destructive' : ''}>
+          {isAnalyzing
+            ? 'Analyzing request...'
+            : isCanceled
+              ? 'Generation canceled'
+              : isError
+                ? 'Generation failed'
+                : isRegenerating
+                  ? `Regenerating ${regeneratePage?.name}...`
+                  : isComplete
+                    ? (regeneratePage
+                      ? `Regenerated ${regeneratePage.name}`
+                      : `Generated ${pages?.length} pages`)
+                    : `Generating ${pages?.length} pages...`}
+        </span>
+      </div>
+
+      {pages?.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {pages.map(page => {
+            const isGenerating = currentPageId === page.id;
+            return (
+              <div key={page.id} className="flex items-center gap-3 text-sm">
+                <div className="size-4 flex items-center justify-center shrink-0">
+                  {page.done
+                    ? <CheckCircle2 className="size-4 text-green-500" />
+                    : isGenerating
+                      ? <Spinner className="size-4" />
+                      : <Circle className="size-4 text-muted-foreground/30" />
+                  }
+                </div>
+                <span className={
+                  page.done ? 'text-muted-foreground line-through' :
+                    isGenerating ? 'text-foreground font-medium' :
+                      'text-muted-foreground'
+                }>
+                  {page.name}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default ChatPanel;
