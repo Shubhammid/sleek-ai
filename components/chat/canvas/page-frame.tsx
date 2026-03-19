@@ -1,8 +1,18 @@
 import { TOOL_MODE_ENUM, ToolModeType } from "@/constants/canvas";
 import { Rnd } from "react-rnd";
 import { getHTMLWrapper } from "@/lib/page-wrapper";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Code2, PaintbrushIcon, Trash2Icon } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
 
 type PropsType = {
   page: any;
@@ -29,6 +39,7 @@ const PageFrame = ({
 
   const [size, setSize] = useState({ width: 1550, height: 900 });
   const [isHovered, setIsHovered] = useState(false);
+  const [showColorScheme, setShowColorScheme] = useState(false);
 
   const fullHtml = getHTMLWrapper(
     page.htmlContent,
@@ -52,6 +63,31 @@ const PageFrame = ({
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [page.id]);
+
+  const colorTokens = useMemo(() => {
+    if (!page.rootStyles) return [];
+    const tokens = [
+      { key: "--background", label: "Background" },
+      { key: "--foreground", label: "Foreground" },
+      { key: "--primary", label: "Primary" },
+      { key: "--secondary", label: "Secondary" },
+      { key: "--accent", label: "Accent" },
+      { key: "--card", label: "Card" },
+      { key: "--muted", label: "Muted" },
+      { key: "--border", label: "Border" },
+    ];
+    return tokens
+      .map(({ key, label }) => {
+        const match = page.rootStyles.match(new RegExp(`${key}:\\s*([^;]+)`));
+        return { label, value: match ? match[1].trim() : null };
+      })
+      .filter((t) => t.value);
+  }, [page.rootStyles]);
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(fullHtml);
+    toast.success("Design code copied to clipboard!");
+  };
 
   return (
     <>
@@ -111,10 +147,79 @@ const PageFrame = ({
               transformOrigin: "bottom left",
             }}
           >
+            <h5 className="text-xs pl-3 pr-6 font-medium truncate max-w-[150px]">
+              {page.name}
+            </h5>
+            <Separator orientation="vertical" className="h-4" />
+            <div className="flex items-center px-2 gap-1">
+              <Popover open={showColorScheme} onOpenChange={setShowColorScheme}>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="p-1! hover:bg-accent
+                     size-6! cursor-pointer
+                    "
+                  >
+                    <PaintbrushIcon className="size-3.5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-52 p-3">
+                  <p
+                    className="text-xs font-semibold
+                  mb-2 text-muted-foreground uppercase"
+                  >
+                    Color Scheme
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {colorTokens.map(({ label, value }: any) => (
+                      <div
+                        key={label}
+                        className="flex items-center justify-between
+                        gap-2"
+                      >
+                        <span
+                          className="text-xs text-muted-foreground
+                        "
+                        >
+                          {label}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <div
+                            className="size-4 rounded-sm border border-border"
+                            style={{ backgroundColor: value! }}
+                          />
+                          <span className="text-xs font-mono text-foreground">
+                            {value}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
 
+              <Button
+                size="icon"
+                variant="ghost"
+                className="p-1! hover:bg-accent size-6! cursor-pointer"
+                onClick={handleCopyCode}
+              >
+                <Code2 className="size-3.5" />
+              </Button>
+
+              <Button
+                size="icon"
+                variant="ghost"
+                className="p-1! hover:bg-accent size-6! cursor-pointer"
+                onClick={() => onDeletePage(page.id)}
+              >
+                {isDeleting ? <Spinner /> : <Trash2Icon className="size-3.5" />}
+              </Button>
+            </div>
           </div>
         )}
-        
+
         <div className="w-full relative overflow-hidden rounded-sm bg-muted/90">
           <iframe
             ref={iframeRef}
