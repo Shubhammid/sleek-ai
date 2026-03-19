@@ -2,6 +2,7 @@ import { TOOL_MODE_ENUM, ToolModeType } from "@/constants/canvas";
 import { Rnd } from "react-rnd";
 import { getHTMLWrapper } from "@/lib/page-wrapper";
 import React, { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 
 type PropsType = {
   page: any;
@@ -88,7 +89,18 @@ const PageFrame = ({
           bottomLeft: isSelected || isHovered ? <Handle /> : undefined,
           bottomRight: isSelected || isHovered ? <Handle /> : undefined,
         }}
-      ></Rnd>
+
+        className={cn(
+          "relative z-30",
+          (isSelected || isHovered) && toolMode !== TOOL_MODE_ENUM.HAND
+          && "ring-4 ring-blue-500 ring-offset-1",
+          toolMode === TOOL_MODE_ENUM.HAND ? `cursor-grab!
+          active:cursor-grabbing!` : `cursor-move`
+        )}
+
+      >
+
+      </Rnd>
     </>
   );
 };
