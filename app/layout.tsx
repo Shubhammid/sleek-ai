@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { InsforgeProvider } from "@/components/insforge-provider";
+import { NuqsAdapter } from 'nuqs/adapters/next/app';
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -38,6 +39,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <InsforgeProvider>
+          <NuqsAdapter>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -50,6 +52,7 @@ export default function RootLayout({
               <Toaster richColors />
             </TooltipProvider>
           </ThemeProvider>
+          </NuqsAdapter>
         </InsforgeProvider>
       </body>
     </html>

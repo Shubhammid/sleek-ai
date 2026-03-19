@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 import CanvasControls from "./canvas-controls";
 import PageFrame from "./page-frame";
+import { useCanvas } from "@/hooks/use-canvas";
 
 type PropsType = {
   pages: any[];
@@ -22,6 +23,8 @@ const Canvas = ({ isProjectLoading }: PropsType) => {
   const [toolMode, setToolMode] = useState<ToolModeType>(TOOL_MODE_ENUM.SELECT);
   const [zoomPercent, setZoomPercent] = useState<number>(26);
   const [currentScale, setCurrentScale] = useState<number>(0.26);
+  const { selectedPageId, setSelectedPageId } = useCanvas()
+
 
   return (
     <>
@@ -64,6 +67,7 @@ const Canvas = ({ isProjectLoading }: PropsType) => {
                     "radial-gradient(circle, color-mix(in oklch, var(--primary) 30%, transparent) 1px, transparent 1px)",
                   backgroundSize: "20px 20px",
                 }}
+                onClick={() => setSelectedPageId(null)}
               >
                 {isProjectLoading && (
                   <div
@@ -96,8 +100,8 @@ const Canvas = ({ isProjectLoading }: PropsType) => {
                       x: 1800,
                       y: 100
                     }}
-                    selectedPageId={null}
-                    setSelectedPageId={() => null}
+                    selectedPageId={selectedPageId}
+                    setSelectedPageId={setSelectedPageId}
                     isDeleting={false}
                     onDeletePage={() => null}
                   />
