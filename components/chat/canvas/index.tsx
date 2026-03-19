@@ -96,8 +96,8 @@ const Canvas = ({ isProjectLoading }: PropsType) => {
                       x: 1800,
                       y: 100
                     }}
-                    selectedPageId={selectedPageId}
-                    setSelectedPageId={setSelectedPageId}
+                    selectedPageId={null}
+                    setSelectedPageId={() => null}
                     isDeleting={false}
                     onDeletePage={() => null}
                   />

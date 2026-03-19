@@ -89,17 +89,47 @@ const PageFrame = ({
           bottomLeft: isSelected || isHovered ? <Handle /> : undefined,
           bottomRight: isSelected || isHovered ? <Handle /> : undefined,
         }}
-
         className={cn(
           "relative z-30",
-          (isSelected || isHovered) && toolMode !== TOOL_MODE_ENUM.HAND
-          && "ring-4 ring-blue-500 ring-offset-1",
-          toolMode === TOOL_MODE_ENUM.HAND ? `cursor-grab!
-          active:cursor-grabbing!` : `cursor-move`
+          (isSelected || isHovered) &&
+            toolMode !== TOOL_MODE_ENUM.HAND &&
+            "ring-4 ring-blue-500 ring-offset-1",
+          toolMode === TOOL_MODE_ENUM.HAND
+            ? `cursor-grab!
+          active:cursor-grabbing!`
+            : `cursor-move`,
         )}
-
+        //style={{ overflow: "visible"}}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
+        {(isSelected || isHovered) && toolMode !== TOOL_MODE_ENUM.HAND && (
+          <div
+            className="absolute -top-13 left-0 z-50 flex items-center bg-card rounded-lg px-1 py-1 shadow-md"
+            style={{
+              transform: `scale(${1 / scale})`,
+              transformOrigin: "bottom left",
+            }}
+          >
 
+          </div>
+        )}
+        
+        <div className="w-full relative overflow-hidden rounded-sm bg-muted/90">
+          <iframe
+            ref={iframeRef}
+            srcDoc={fullHtml}
+            title={page.name}
+            sandbox="allow-scripts"
+            style={{
+              width: "100%",
+              height: `${size.height}px`,
+              border: "none",
+              display: "block",
+              pointerEvents: "none",
+            }}
+          />
+        </div>
       </Rnd>
     </>
   );
