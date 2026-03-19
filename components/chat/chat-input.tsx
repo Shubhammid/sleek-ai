@@ -60,7 +60,9 @@ const ChatInput = ({
     }
 
     setShowAuthBanner(false);
-    onSubmit(message, {});
+    onSubmit(message, {
+      
+    });
   };
 
   return (
