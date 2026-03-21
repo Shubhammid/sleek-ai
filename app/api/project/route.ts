@@ -3,7 +3,11 @@ import {
   generateProjectTitle,
 } from "@/app/action/action";
 import { getAuthServer } from "@/lib/insforge-server";
-import { SLEEK_CHAT_PROMPT, SLEEK_INTENT_PROMPT } from "@/lib/prompt";
+import {
+  SLEEK_CHAT_PROMPT,
+  SLEEK_INTENT_PROMPT,
+  WEB_ANALYSIS_PROMPT,
+} from "@/lib/prompt";
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,
@@ -220,7 +224,83 @@ export async function POST(request: NextRequest) {
               return;
             }
 
-            
+            const isRegen =
+              classification.intent === "regenerate" && !!selectedPage;
+
+            console.log(classification, "classification", isRegen);
+
+            emit(
+              writer,
+              "generation",
+              {
+                status: "analyzing",
+                page: [],
+              },
+              {
+                id: "gen-card",
+              },
+            );
+
+            const analysisResult = await insforge.ai.chat.completions.create({
+              model: "anthropic/claude-sonnet-4.5",
+              messages: [
+                {
+                  role: "system",
+                  content: WEB_ANALYSIS_PROMPT,
+                },
+                {
+                  role: "user",
+                  content: [
+                    ...imageParts,
+                    {
+                      type: "text",
+                      text: `${
+                        imageParts.length > 0
+                          ? `Reference image attached — extract EVERY detail: colors, layout, components, spacing. Match it precisely.\n\n`
+                          : ""
+                      }
+    ${
+      selectedPage && isRegen
+        ? `EDITING THIS PAGE:\n- Name: ${selectedPage.name}\n- Current Styles:\n${selectedPage.rootStyles}\n- Current HTML:\n${selectedPage.htmlContent}\nBe surgical apply only requested changes.\n\n`
+        : selectedPage && !isRegen
+          ? `STYLE REFERENCE (match this brand DNA):
+                              - Name: ${selectedPage.name}
+                              - Brand Colors & Fonts: See Styles below.
+                              - Logo/Header Pattern: ${selectedPage.htmlContent.substring(0, 1500)}
+                              - Styles:${selectedPage.rootStyles}\n\n`
+          : ""
+    }
+        ${
+          hasExistingPages && !isRegen
+            ? `EXISTING PAGES (do NOT recreate):\n${existingPages!.map((p: any) => `- ${p.name}\n${p.rootStyles}`).join("\n")}\n\n`
+            : ""
+        }
+        USER REQUEST: "${latestUserMessage}"OUTPUT RAW JSON ONLY.`.trim(),
+                    },
+                  ],
+                },
+              ],
+              maxTokens: 28000,
+            });
+
+            checkAbort();
+
+            let analysis: any;
+            const analysisText =
+              analysisResult.choices[0].message.content || "{}";
+              
+            try {
+              const jsonStart = analysisText.indexOf('{');
+              const jsonEnd = analysisText.lastIndexOf('}');
+              if (jsonStart === -1 || jsonEnd === -1) throw new Error("No JSON object found");
+              const cleanJson = analysisText.substring(jsonStart, jsonEnd + 1);
+              analysis = JSON.parse(cleanJson)
+            } catch (error) {
+              console.log("Analysis error", error);
+              throw new Error("Failed to parse json output");
+            }
+
+
           }
         } catch (error) {
           console.log(error);
