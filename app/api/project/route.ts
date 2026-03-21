@@ -3,6 +3,7 @@ import {
   generateProjectTitle,
 } from "@/app/action/action";
 import { getAuthServer } from "@/lib/insforge-server";
+import { SLEEK_CHAT_PROMPT, SLEEK_INTENT_PROMPT } from "@/lib/prompt";
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,
@@ -11,24 +12,32 @@ import {
 } from "ai";
 import { NextRequest, NextResponse } from "next/server";
 
+class AbortError extends Error {
+  constructor() {
+    super("Request aborted");
+    this.name = "AbortError";
+  }
+}
+
 const emit = (
   writer: any,
   type: string,
   data: object = {},
   options?: {
     id?: string;
-    transient?: boolean
-  }
+    transient?: boolean;
+  },
 ) => {
   writer.write({
     id: options?.id,
     type: `data-${type}`,
     data,
-    transient: options?.transient
-  })
-}
+    transient: options?.transient,
+  });
+};
 
 export async function POST(request: NextRequest) {
+  const { signal } = request;
   try {
     const { messages, slugId, selectedPageId } = (await request.json()) as {
       messages: UIMessage[];
@@ -120,6 +129,10 @@ export async function POST(request: NextRequest) {
           .single()
       : { data: null };
 
+    const checkAbort = () => {
+      if (signal.aborted) throw new AbortError();
+    };
+
     const uiStream = createUIMessageStream({
       generateId: generateId,
       async execute({ writer }) {
@@ -133,9 +146,84 @@ export async function POST(request: NextRequest) {
               },
               { id: "proj-title", transient: true },
             );
+
+            checkAbort();
+            const result = await insforge.ai.chat.completions.create({
+              model: "anthropic/claude-sonnet-4.5",
+              messages: [
+                {
+                  role: "system",
+                  content: SLEEK_INTENT_PROMPT,
+                },
+                {
+                  role: "user",
+                  content: `${latestUserMessage}\nCLASSIFY THE INTENT NOW. ONE WORD ONLY`,
+                },
+              ],
+            });
+
+            const classify_output = result.choices[0].message.content
+              .trim()
+              .toLowerCase();
+
+            const firstWord = classify_output.split(" ")[0];
+            const validIntents = ["chat", "generate", "regenerate"];
+            const intent = validIntents.includes(firstWord)
+              ? (firstWord as any)
+              : "chat";
+
+            const classification = { intent };
+
+            if (classification.intent === "chat") {
+              const chatResult = await insforge.ai.chat.completions.create({
+                model: "google/gemini-2.5-pro",
+                messages: [
+                  {
+                    role: "system",
+                    content: SLEEK_CHAT_PROMPT,
+                  },
+                  ...modelMessages,
+                ],
+                stream: true,
+                webSearch: { enabled: false },
+              });
+
+              const chatId = generateId();
+              let chatText = "";
+
+              writer.write({ type: "text-start", id: chatId });
+
+              for await (const chunk of chatResult) {
+                checkAbort();
+                const delta = chunk.choices[0]?.delta?.content || "";
+                chatText += delta;
+                if (delta) {
+                  writer.write({
+                    type: "text-delta",
+                    id: chatId,
+                    delta,
+                  });
+                }
+              }
+
+              writer.write({ type: "text-end", id: chatId });
+              checkAbort();
+
+              await insforge.database.from("messages").insert([
+                {
+                  projectId,
+                  role: "assistant",
+                  parts: [{ type: "text", text: chatText }],
+                },
+              ]);
+
+              return;
+            }
+
+            
           }
         } catch (error) {
-          console.log(error)
+          console.log(error);
         }
       },
     });

@@ -47,6 +47,15 @@ const ChatInterface = ({
     onData(dataPart) {
       const part = dataPart as any;
       const data = part.data;
+
+      switch (part.type) {
+        case "data-project-title": {
+          if (data.title) setProjectTitle(data.title);
+          break;
+        }
+        default:
+          break;
+      }
     },
     onError: (error) => {
       console.log(error);
