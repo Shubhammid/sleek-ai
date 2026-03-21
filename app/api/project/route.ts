@@ -1,6 +1,6 @@
 import { convertModelMessages, generateProjectTitle } from "@/app/action/action";
 import { getAuthServer } from "@/lib/insforge-server";
-import { UIMessage } from "ai";
+import { createUIMessageStream, generateId, UIMessage } from "ai";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -77,6 +77,13 @@ export async function POST(request: NextRequest) {
           url: p.url
         }
       }))
+    
+    const uiStream = createUIMessageStream({
+      generateId: generateId,
+      async execute({writer}){
+
+      }
+    })
 
     } catch (error) {
     console.log(error);
