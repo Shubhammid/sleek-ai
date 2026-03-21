@@ -44,6 +44,10 @@ const ChatInterface = ({
         };
       },
     }),
+    onData(dataPart) {
+      const part = dataPart as any;
+      const data = part.data;
+    },
     onError: (error) => {
       console.log(error);
       toast.error("Failed to generate response");
@@ -103,10 +107,10 @@ const ChatInterface = ({
       setSlugId(generateSlugId());
       setHasStarted(false);
       setMessages([]);
-      setProjectTitle(null)
+      setProjectTitle(null);
     }
     router.push("/");
-  }
+  };
 
   if (!isProjectPage && !hasStarted) {
     return (
@@ -139,7 +143,7 @@ const ChatInterface = ({
           </div>
         </div>
 
-      <ChatPanel
+        <ChatPanel
           className="h-full pt-8"
           messages={messages}
           input={input}
@@ -152,9 +156,7 @@ const ChatInterface = ({
         />
       </div>
       <div className="flex-1">
-        <Canvas
-          
-        />
+        <Canvas />
       </div>
     </div>
   );
