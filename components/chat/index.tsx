@@ -113,8 +113,22 @@ const ChatInterface = ({
           });
           break;
         }
-        default:
+        case "data-page-loading": {
+          const pageId = data.pageId;
+          setPages(prev => {
+            const idx = prev.findIndex(p => p.id === pageId);
+            if (idx !== -1) {
+              const updated = [...prev];
+              updated[idx] = {
+                ...updated[idx],
+                isLoading: true
+              };
+              return updated;
+            }
+            return prev
+          });
           break;
+        }
       }
     },
     onError: (error) => {

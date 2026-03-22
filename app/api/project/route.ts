@@ -269,7 +269,7 @@ Write 1-2 sentences in first person. Natural, confident. No questions. No "let m
   }
   writer.write({ type: "text-end", id: summaryId });
 
-  checkAbort()
+  checkAbort();
   await insforge.database.from("messages").insert([
     {
       projectId,
@@ -283,8 +283,158 @@ Write 1-2 sentences in first person. Natural, confident. No questions. No "let m
             pages: pages.map((p: any) => ({
               id: p.id,
               name: p.name,
+              done: true,
+            })),
+          },
+        },
+        { type: "text", text: fullSummaryText },
+      ],
+    },
+  ]);
+}
+
+async function runRegenerateWorker({
+  insforge,
+  writer,
+  projectId,
+  selectedPage,
+  latestUserMessage,
+  analysis,
+  checkAbort,
+}: any) {
+  if (!selectedPage) {
+    writer.write({
+      type: "error",
+      errorText: "No Page was selected "
+    })
+    return
+  }
+
+  if (!analysis || analysis?.pages?.length === 0) {
+    throw new Error("No pages generated");
+  }
+
+  emit(writer, "page-loading", {
+    pageId: selectedPage.id,
+    isLoading: true
+  }, { transient: true })
+
+  emit(writer, "generation", {
+    status: "regenerating",
+    regeneratePage: {
+      id: selectedPage.id,
+      name: selectedPage.name,
+      done: false
+    }
+  }, { id: "gen-card" })
+
+  const result = await insforge.ai.chat.completions.create({
+    model: "google/gemini-3-flash-preview",
+    messages: [
+      {
+        role: "system",
+        content: WEB_GENERATION_PROMPT,
+      },
+      {
+        role: "user",
+        content: `
+                You are surgically editing an existing page.
+                RULE: Return the COMPLETE page HTML with ONLY the requested change applied. Every other section, component, and element must remain exactly as it is in the Current HTML.
+
+                EDITING: "${selectedPage.name}"
+                USER REQUEST: "${latestUserMessage}"
+                CHANGE ONLY: ${analysis.pages[0].visualDescription}
+                Current HTML: ${selectedPage.htmlContent}
+                Return the full page HTML with only the requested change. Start with <div.`.trim()
+      }
+    ],
+    webSearch: { enabled: false },
+    maxTokens: 28000
+  });
+
+  let htmlContent = result.choices[0].message.content ?? '';
+  const match = htmlContent.match(/<div[\s\S]*<\/div>/);
+  htmlContent = match ? match[0] : htmlContent;
+  htmlContent = htmlContent.replace(/```/g, '');
+
+  const { data: updatedPage, error } = await insforge.database.from("pages")
+    .update({
+      htmlContent,
+      rootStyles: analysis.rootStyles
+    })
+    .eq("id", selectedPage.id).select().single()
+
+  if (error) {
+    console.log(error, "Failed to update selected Page")
+  }
+
+  emit(writer, "page-created", {
+    page: {
+      id: updatedPage.id,
+      name: updatedPage.name,
+      rootStyles: updatedPage.rootStyles,
+      htmlContent: updatedPage.htmlContent,
+      isLoading: false,
+    }
+  }, { transient: true })
+
+  emit(writer, "generation", {
+    status: "complete",
+    regeneratePage: {
+      id: updatedPage.id,
+      name: updatedPage.name,
+      done: true
+    }
+  }, { id: "gen-card" })
+
+
+  const summaryResult = await insforge.ai.chat.completions.create({
+    model: 'google/gemini-2.5-flash-lite',
+    messages: [
+      {
+        role: "system",
+        content: `You are Sleek, an AI web design agent. You just finished building pages.
+Write 1-2 sentences in first person. Natural, confident. No questions. No "let me know".`
+      },
+      {
+        role: 'user',
+        content: `Updated: ${updatedPage.name} for: "${latestUserMessage}". Summarize briefly.`
+      }
+
+    ],
+    stream: true,
+    webSearch: { enabled: false }
+  })
+
+  const summaryId = generateId();
+  let fullSummaryText = "";
+
+  writer.write({ type: "text-start", id: summaryId })
+  for await (const chunk of summaryResult) {
+    const delta = chunk.choices[0].delta?.content || "";
+    fullSummaryText += delta
+    if (delta) {
+      writer.write({ type: "text-delta", id: summaryId, delta: delta })
+    }
+  }
+  writer.write({ type: "text-end", id: summaryId });
+
+  checkAbort()
+  await insforge.database.from("messages").insert([
+    {
+      projectId,
+      role: "assistant",
+      parts: [
+        {
+          type: "data-generation",
+          id: "gen-card",
+          data: {
+            status: "complete",
+            regeneratePage: {
+              id: updatedPage.id,
+              name: updatedPage.name,
               done: true
-            }))
+            }
           }
         },
         { type: "text", text: fullSummaryText }
@@ -481,7 +631,7 @@ export async function POST(request: NextRequest) {
             }
 
             const isRegen =
-              classification.intent === "regenerate" && !!selectedPage;
+            classification.intent === "regenerate" && !!selectedPage;
 
             console.log(classification, "classification", isRegen);
 
@@ -561,15 +711,15 @@ export async function POST(request: NextRequest) {
 
             if (isRegen && selectedPageId) {
               checkAbort();
-              // await runRegenerateWorker({
-              //   insforge,
-              //   writer,
-              //   projectId,
-              //   selectedPage,
-              //   latestUserMessage,
-              //   analysis,
-              //   checkAbort,
-              // })
+              await runRegenerateWorker({
+                insforge,
+                writer,
+                projectId,
+                selectedPage,
+                latestUserMessage,
+                analysis,
+                checkAbort,
+              });
               return;
             }
 
