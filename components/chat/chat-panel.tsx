@@ -103,7 +103,10 @@ const ChatPanel = ({
                             return (
                               <GenerationCard
                                 key={`${message.id}-gen-${i}`}
-                                //status={data.status}
+                                status={data.status}
+                                pages={data.pages}
+                                currentPageId={data.currentPageId}
+                                regeneratePage={data.regeneratePage}
                               />
                             );
 
@@ -123,12 +126,9 @@ const ChatPanel = ({
               <Loader />
             </div>
           ) : null}
-          
+
           {status === "error" && error && (
-            <ErrorAlert
-              title="Chat Error"
-              message={"Something went wrong"}
-            />
+            <ErrorAlert title="Chat Error" message={"Something went wrong"} />
           )}
         </ConversationContent>
       </Conversation>
@@ -147,52 +147,52 @@ const ChatPanel = ({
   );
 };
 
-const ErrorAlert = ({ title, message }: {
-  title: string;
-  message: string;
-}) => {
+const ErrorAlert = ({ title, message }: { title: string; message: string }) => {
   return (
     <>
-      <Alert
-        variant="destructive"
-        className="w-full"
-      >
+      <Alert variant="destructive" className="w-full">
         <AlertCircleIcon className="h-4 w-4" />
         <div>
           <AlertTitle>{title}</AlertTitle>
-          <AlertDescription>
-            {message}
-          </AlertDescription>
+          <AlertDescription>{message}</AlertDescription>
         </div>
       </Alert>
     </>
-  )
-}
-
+  );
+};
 
 const GenerationCard = ({
   status,
   pages,
   currentPageId,
-  regeneratePage
+  regeneratePage,
 }: {
-  status: 'analyzing' | 'generating' | 'regenerating' | 'canceled' | 'complete' | 'error';
-  pages: { id: string, name: string, done: boolean }[]
-  regeneratePage: { id: string, name: string, done: boolean }
-  currentPageId?: string
+  status:
+    | "analyzing"
+    | "generating"
+    | "regenerating"
+    | "canceled"
+    | "complete"
+    | "error";
+  pages: { id: string; name: string; done: boolean }[];
+  regeneratePage: { id: string; name: string; done: boolean };
+  currentPageId?: string;
 }) => {
   const isComplete = status === "complete";
   const isAnalyzing = status === "analyzing";
   const isCanceled = status === "canceled";
   const isError = status === "error";
-  const isRegenerating = status === "regenerating"
+  const isRegenerating = status === "regenerating";
   return (
-    <div className={`mx-2 my-2 rounded-xl border p-4 flex flex-col
+    <div
+      className={`mx-2 my-2 rounded-xl border p-4 flex flex-col
     gap-3 shadow-sm animate-in fade-in slide-in-from-bottom-2
-    ${isError
-        ? 'border-destructive/30 bg-destructive/5'
-        : 'border-border bg-card'
-      }`}>
+    ${
+      isError
+        ? "border-destructive/30 bg-destructive/5"
+        : "border-border bg-card"
+    }`}
+    >
       <div className="flex items-center gap-2 text-sm font-medium">
         {isComplete ? (
           <CheckCircle2 className="size-4 text-green-500 shrink-0" />
@@ -203,42 +203,47 @@ const GenerationCard = ({
         ) : (
           <Spinner className="size-4 shrink-0" />
         )}
-        <span className={isError ? 'text-destructive' : ''}>
+        <span className={isError ? "text-destructive" : ""}>
           {isAnalyzing
-            ? 'Analyzing request...'
+            ? "Analyzing request..."
             : isCanceled
-              ? 'Generation canceled'
+              ? "Generation canceled"
               : isError
-                ? 'Generation failed'
+                ? "Generation failed"
                 : isRegenerating
                   ? `Regenerating ${regeneratePage?.name}...`
                   : isComplete
-                    ? (regeneratePage
+                    ? regeneratePage
                       ? `Regenerated ${regeneratePage.name}`
-                      : `Generated ${pages?.length} pages`)
+                      : `Generated ${pages?.length} pages`
                     : `Generating ${pages?.length} pages...`}
         </span>
       </div>
 
       {pages?.length > 0 && (
         <div className="flex flex-col gap-2">
-          {pages.map(page => {
+          {pages.map((page) => {
             const isGenerating = currentPageId === page.id;
             return (
               <div key={page.id} className="flex items-center gap-3 text-sm">
                 <div className="size-4 flex items-center justify-center shrink-0">
-                  {page.done
-                    ? <CheckCircle2 className="size-4 text-green-500" />
-                    : isGenerating
-                      ? <Spinner className="size-4" />
-                      : <Circle className="size-4 text-muted-foreground/30" />
-                  }
+                  {page.done ? (
+                    <CheckCircle2 className="size-4 text-green-500" />
+                  ) : isGenerating ? (
+                    <Spinner className="size-4" />
+                  ) : (
+                    <Circle className="size-4 text-muted-foreground/30" />
+                  )}
                 </div>
-                <span className={
-                  page.done ? 'text-muted-foreground line-through' :
-                    isGenerating ? 'text-foreground font-medium' :
-                      'text-muted-foreground'
-                }>
+                <span
+                  className={
+                    page.done
+                      ? "text-muted-foreground line-through"
+                      : isGenerating
+                        ? "text-foreground font-medium"
+                        : "text-muted-foreground"
+                  }
+                >
                   {page.name}
                 </span>
               </div>
@@ -247,7 +252,7 @@ const GenerationCard = ({
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
 export default ChatPanel;

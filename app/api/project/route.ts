@@ -183,7 +183,10 @@ ${page.rootStyles}
       .select()
       .single();
 
-    if (error) console.log(error, "Page failed to save");
+    if (error || !savedPage) {
+      console.log(error || "No data returned", "Page failed to save");
+      continue;
+    }
 
     generationPages.push({
       name: page.name,

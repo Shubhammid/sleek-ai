@@ -12,6 +12,7 @@ import { Button } from "../ui/button";
 import { ArrowLeft } from "lucide-react";
 import ChatPanel from "./chat-panel";
 import Canvas from "./canvas";
+import { PageType } from "@/types/project";
 
 type PropsType = {
   isProjectPage?: boolean;
@@ -30,6 +31,8 @@ const ChatInterface = ({
   const [input, setInput] = useState("");
   const [hasStarted, setHasStarted] = useState(isProjectPage);
   const [projectTitle, setProjectTitle] = useState<string | null>(null);
+  const [pages, setPages] = useState<PageType[]>([]);
+
 
   const { messages, sendMessage, setMessages, status, error, stop } = useChat({
     messages: [],
@@ -51,6 +54,43 @@ const ChatInterface = ({
       switch (part.type) {
         case "data-project-title": {
           if (data.title) setProjectTitle(data.title);
+          break;
+        }
+        case "data-pages-skeleton": {
+          const newPages = (data?.pages || []).map((page: any) => ({
+            id: page.id,
+            name: page.name,
+            rootStyles: page.rootStyles,
+            htmlContent: "",
+            isLoading: true
+          }))
+          setPages((prev) => {
+            const existingIds = new Set(prev.map(p => p.id));
+            const toAdd = newPages.filter((p: any) => !existingIds.has(p.id));
+            return [...prev, ...toAdd]
+          })
+          break;
+        }
+        case "data-page-created": {
+          const page = data.page
+          const tempId = data.tempId
+          setPages((prev) => {
+            const idx = prev.findIndex(p => p.id === tempId ||
+              p.id === page.id
+            )
+            if (idx !== -1) {
+              const updated = [...prev];
+              updated[idx] = {
+                ...page,
+                isLoading: false
+              };
+              return updated;
+            }
+            return [...prev, {
+              ...page,
+              isLoading: false
+            }]
+          })
           break;
         }
         default:
@@ -165,7 +205,12 @@ const ChatInterface = ({
         />
       </div>
       <div className="flex-1">
-        <Canvas />
+        <Canvas
+          pages={pages}
+          setPages={setPages}
+          slugId={slugId}
+          isProjectLoading={false}
+        />
       </div>
     </div>
   );
