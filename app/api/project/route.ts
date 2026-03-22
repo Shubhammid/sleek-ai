@@ -24,6 +24,27 @@ class AbortError extends Error {
   }
 }
 
+export async function GET() {
+  try {
+    const { user, insforge } = await getAuthServer();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { data: projects, error } = await insforge.database.from("projects")
+      .select("id, title, slugId, createdAt")
+      .order("createdAt", { ascending: false })
+      .limit(10);
+
+    if (error) NextResponse.json({ error: "Failed to fetch projects" }, {
+      status: 400
+    });
+
+    return NextResponse.json(projects)
+  } catch (error) {
+    console.log(error);
+    return NextResponse.json({ error: "internal server error" }, { status: 500 })
+  }
+}
+
 const emit = (
   writer: any,
   type: string,

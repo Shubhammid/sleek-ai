@@ -3,6 +3,8 @@ import { motion } from "motion/react";
 import { PromptInputMessage } from "../ai-elements/prompt-input";
 import { Suggestion, Suggestions } from "../ai-elements/suggestion";
 import ChatInput from "./chat-input";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 
 type PropsType = {
   input: string;
@@ -148,13 +150,85 @@ const NewProjectChat = ({
             transition={{ delay: 0.5 }}
             className="flex justify-center w-full max-w-3xl mx-auto"
           >
-            Projects
-            {/* <ProjectGrid /> */}
+            <ProjectGrid />
           </motion.div>
         </div>
       </div>
     </div>
   );
 };
+
+const ProjectGrid = () => {
+  const { data: projects, isLoading } = useQuery({
+    queryKey: ["projects"],
+    queryFn: async () => {
+      const res = await fetch(`/api/project`);
+      if (!res.ok) return [];
+      return res.json() as Promise<
+        {
+          id: string;
+          title: string;
+          slugId: string;
+          createdAt: string;
+        }[]
+      >;
+    },
+  });
+
+  console.log(projects);
+
+  if (isLoading) return <ProjectGridSkeleton />;
+  if (!projects || projects.length === 0) {
+    return null;
+  }
+  return (
+    <div className="w-full mx-auto pt-8 px-8">
+      <h5 className="text-sm font-medium text-muted-foreground mb-4 px-2">
+        Recent Projects
+      </h5>
+      <div
+        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4
+       xl:grid-cols-5 gap-4
+      "
+      >
+        {projects?.map((project) => (
+          <Link
+            key={project.id}
+            href={`/project/${project.slugId}`}
+            className="group flex flex-col gap-2 transition-all"
+          >
+            <div className="aspect-4/3 rounded-xl bg-muted overflow-hidden relative border border-border group-hover:border-primary">
+              <div
+                className="absolute inset-0 bg-linear-to-br from-primary/5
+        to-primary/20"
+              />
+
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xs">{project.title.charAt(0)}</span>
+              </div>
+            </div>
+            <h4 className="text-sm font-medium truncate px-1">
+              {project.title}
+            </h4>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ProjectGridSkeleton = () => (
+  <div className="w-full  mx-auto mt-4 px-12 animate-pulse">
+    <div className="h-4 w-32 bg-muted rounded mb-4 ml-2" />
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex flex-col gap-2">
+          <div className="aspect-4/3 rounded-xl bg-muted border border-border" />
+          <div className="h-4 w-20 bg-muted rounded mx-1" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 export default NewProjectChat;
