@@ -3,8 +3,8 @@
 import { useChat } from "@ai-sdk/react";
 import { generateSlugId } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { DefaultChatTransport } from "ai";
+import { useEffect, useRef, useState } from "react";
+import { DefaultChatTransport, UIMessage } from "ai";
 import { toast } from "sonner";
 import { PromptInputMessage } from "../ai-elements/prompt-input";
 import NewProjectChat from "./new-project-chat";
@@ -13,6 +13,7 @@ import { ArrowLeft } from "lucide-react";
 import ChatPanel from "./chat-panel";
 import Canvas from "./canvas";
 import { PageType } from "@/types/project";
+import { useQuery } from "@tanstack/react-query";
 
 type PropsType = {
   isProjectPage?: boolean;
@@ -33,6 +34,21 @@ const ChatInterface = ({
   const [projectTitle, setProjectTitle] = useState<string | null>(null);
   const [pages, setPages] = useState<PageType[]>([]);
 
+  const { data: projectData, isLoading: isProjectLoading } = useQuery({
+    queryKey: ["project", slugId],
+    queryFn: async () => {
+      const res = await fetch(`/api/project/${slugId}`);
+      if (!res.ok) throw new Error("Failed to fetch project");
+      return res.json() as Promise<{
+        title: string;
+        messages: UIMessage[];
+        pages: PageType[];
+      }>;
+    },
+    enabled: isProjectPage,
+    refetchOnWindowFocus: false,
+    staleTime: 1000 * 60 * 5,
+  });
 
   const { messages, sendMessage, setMessages, status, error, stop } = useChat({
     messages: [],
@@ -62,35 +78,38 @@ const ChatInterface = ({
             name: page.name,
             rootStyles: page.rootStyles,
             htmlContent: "",
-            isLoading: true
-          }))
+            isLoading: true,
+          }));
           setPages((prev) => {
-            const existingIds = new Set(prev.map(p => p.id));
+            const existingIds = new Set(prev.map((p) => p.id));
             const toAdd = newPages.filter((p: any) => !existingIds.has(p.id));
-            return [...prev, ...toAdd]
-          })
+            return [...prev, ...toAdd];
+          });
           break;
         }
         case "data-page-created": {
-          const page = data.page
-          const tempId = data.tempId
+          const page = data.page;
+          const tempId = data.tempId;
           setPages((prev) => {
-            const idx = prev.findIndex(p => p.id === tempId ||
-              p.id === page.id
-            )
+            const idx = prev.findIndex(
+              (p) => p.id === tempId || p.id === page.id,
+            );
             if (idx !== -1) {
               const updated = [...prev];
               updated[idx] = {
                 ...page,
-                isLoading: false
+                isLoading: false,
               };
               return updated;
             }
-            return [...prev, {
-              ...page,
-              isLoading: false
-            }]
-          })
+            return [
+              ...prev,
+              {
+                ...page,
+                isLoading: false,
+              },
+            ];
+          });
           break;
         }
         default:
@@ -102,6 +121,16 @@ const ChatInterface = ({
       toast.error("Failed to generate response");
     },
   });
+
+  const lastSyncedSlug = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (projectData && slugId !== lastSyncedSlug.current) {
+      if (projectData.messages) setMessages(projectData.messages);
+      if (projectData.pages) setPages(projectData.pages);
+      lastSyncedSlug.current = slugId;
+    }
+  }, [projectData, slugId, setMessages]);
 
   useEffect(() => {
     const checkReset = () => {
@@ -187,7 +216,7 @@ const ChatInterface = ({
               <ArrowLeft />
             </Button>
             <h5 className="font-semibold tracking-tight truncate pr-4">
-              {projectTitle || "Untitled Project"}
+              {projectTitle || projectData?.title || "Untitled Project"}
             </h5>
           </div>
         </div>
@@ -198,6 +227,7 @@ const ChatInterface = ({
           input={input}
           setInput={setInput}
           isLoading={isLoading}
+          isProjectLoading={isProjectLoading}
           status={status}
           error={error}
           onStop={stop}
@@ -209,7 +239,7 @@ const ChatInterface = ({
           pages={pages}
           setPages={setPages}
           slugId={slugId}
-          isProjectLoading={false}
+          isProjectLoading={isProjectLoading}
         />
       </div>
     </div>

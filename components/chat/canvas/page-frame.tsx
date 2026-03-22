@@ -13,9 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Code2, PaintbrushIcon, Trash2Icon } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageType } from "@/types/project";
 
 type PropsType = {
-  page: any;
+  page: PageType;
   initialPosition?: { x: number; y: number };
   scale?: number;
   toolMode: ToolModeType;
@@ -221,19 +223,29 @@ const PageFrame = ({
         )}
 
         <div className="w-full relative overflow-hidden rounded-sm bg-muted/90">
-          <iframe
-            ref={iframeRef}
-            srcDoc={fullHtml}
-            title={page.name}
-            sandbox="allow-scripts"
-            style={{
-              width: "100%",
-              height: `${size.height}px`,
-              border: "none",
-              display: "block",
-              pointerEvents: "none",
-            }}
-          />
+          {page.isLoading ? (
+            <div className="w-full h-full flex flex-col py-10 px-10 gap-3
+                bg-black/50 dark:bg-white/50 animate-pulse rounded-sm mx-px"
+              style={{ width: size.width, height: size.height }}>
+              <Skeleton className="w-full h-8 bg-black/50 dark:bg-white/50" />
+              <Skeleton className="w-1/2 h-10 bg-black/50 dark:bg-white/50 curs" />
+            </div>
+          ) : (
+            <iframe
+              ref={iframeRef}
+              srcDoc={fullHtml}
+              title={page.name}
+              sandbox='allow-scripts'
+              style={{
+                width: "100%",
+                height: `${size.height}px`,
+                border: "none",
+                display: "block",
+                pointerEvents: "none"
+              }}
+            />
+
+          )}
         </div>
       </Rnd>
     </>
