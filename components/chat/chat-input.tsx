@@ -31,27 +31,33 @@ import {
   AttachmentRemove,
   Attachments,
 } from "../ai-elements/attachments";
+import { PageType } from "@/types/project";
+import { useCanvas } from "@/hooks/use-canvas";
+import { Badge } from "../ui/badge";
 
 type ChatInputProps = {
   input: string;
   isLoading: boolean;
   status: ChatStatus;
+  selectedPage?: PageType;
   setInput: (input: string) => void;
   onStop: () => void;
   onSubmit: (message: PromptInputMessage, options?: any) => void;
-};
+}
 
 const ChatInput = ({
   input,
   isLoading,
   status,
-  //selectedPage,
+  selectedPage,
   setInput,
   onStop,
   onSubmit,
 }: ChatInputProps) => {
   const { isSignedIn } = useAuth();
   const [showAuthBanner, setShowAuthBanner] = useState(false);
+
+  const { setSelectedPageId } = useCanvas()
 
   const handleSubmit = (message: PromptInputMessage) => {
     if (!isSignedIn) {
@@ -61,8 +67,9 @@ const ChatInput = ({
 
     setShowAuthBanner(false);
     onSubmit(message, {
-      
+      selectedPageId: selectedPage?.id
     });
+    setSelectedPageId(null)
   };
 
   return (
@@ -110,6 +117,16 @@ const ChatInput = ({
         className="rounded-xl! shadow-md bg-background border"
         onSubmit={handleSubmit}
       >
+        {selectedPage && (
+          <div className='px-2 pt-2 w-full'>
+            <Badge variant="secondary" className="text-xs">
+              {selectedPage.name} Page
+              <button onClick={() => setSelectedPageId(null)}>
+                <XIcon className="size-3.5" />
+              </button>
+            </Badge>
+          </div>
+        )}
         <PromptInputAttachmentsDisplay />
         <PromptInputBody>
           <PromptInputTextarea

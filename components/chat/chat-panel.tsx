@@ -21,6 +21,7 @@ import { AlertCircleIcon, CheckCircle2, Circle } from "lucide-react";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Loader } from "../ui/loader";
+import { PageType } from "@/types/project";
 
 type PropsType = {
   className?: string;
@@ -33,6 +34,7 @@ type PropsType = {
   onStop: () => void;
   onSubmit: (message: PromptInputMessage, options?: any) => void;
   status: ChatStatus;
+  selectedPage?: PageType
 };
 
 const ChatPanel = ({
@@ -46,6 +48,7 @@ const ChatPanel = ({
   status,
   error,
   isProjectLoading,
+  selectedPage
 }: PropsType) => {
   return (
     <div className="relative flex flex-col flex-1 overflow-hidden">
@@ -138,6 +141,7 @@ const ChatPanel = ({
           input={input}
           isLoading={isLoading}
           status={status}
+          selectedPage={selectedPage}
           setInput={setInput}
           onStop={onStop}
           onSubmit={onSubmit}

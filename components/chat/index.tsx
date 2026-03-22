@@ -14,6 +14,7 @@ import ChatPanel from "./chat-panel";
 import Canvas from "./canvas";
 import { PageType } from "@/types/project";
 import { useQuery } from "@tanstack/react-query";
+import { useCanvas } from "@/hooks/use-canvas";
 
 type PropsType = {
   isProjectPage?: boolean;
@@ -151,6 +152,8 @@ const ChatInterface = ({
     return () => window.removeEventListener("popstate", checkReset);
   }, [pathname, hasStarted, isProjectPage, setMessages]);
 
+  const { selectedPageId } = useCanvas()
+
   const isLoading = status === "submitted" || status === "streaming";
 
   const onSubmit = async (message: PromptInputMessage, options: any = {}) => {
@@ -203,6 +206,8 @@ const ChatInterface = ({
     );
   }
 
+  const selectedPage = pages.find((p) => p.id === selectedPageId);
+
   return (
     <div className="flex h-screen w-full overflow-hidden">
       <div className="flex relative w-full max-w-md border-r border-border">
@@ -228,6 +233,7 @@ const ChatInterface = ({
           setInput={setInput}
           isLoading={isLoading}
           isProjectLoading={isProjectLoading}
+          selectedPage={selectedPage}
           status={status}
           error={error}
           onStop={stop}
