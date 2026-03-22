@@ -1,5 +1,5 @@
 import ChatInterface from '@/components/chat'
-import React from 'react'
+import React, { Suspense } from 'react'
 
 const Page = async ({ params }: {
   params: Promise<{ slugId: string }>
@@ -7,11 +7,13 @@ const Page = async ({ params }: {
   const { slugId } = await params;
   return (
     <div>
-      <ChatInterface
-        key={slugId}
-        isProjectPage={true}
-        slugId={slugId}
-      />
+      <Suspense fallback={<div>Loading project...</div>}>
+        <ChatInterface
+          key={slugId}
+          isProjectPage={true}
+          slugId={slugId}
+        />
+      </Suspense>
     </div>
   )
 }
