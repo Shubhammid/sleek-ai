@@ -7,6 +7,7 @@ import {
   SLEEK_CHAT_PROMPT,
   SLEEK_INTENT_PROMPT,
   WEB_ANALYSIS_PROMPT,
+  WEB_GENERATION_PROMPT,
 } from "@/lib/prompt";
 import {
   createUIMessageStream,
@@ -50,32 +51,207 @@ async function runGenerationWorker({
   checkAbort,
 }: any) {
   const { pages } = analysis;
-  console.log(pages?.length, pages, "pages")
+  console.log(pages?.length, pages, "pages");
 
   if (!analysis || !pages || pages?.length === 0) {
     throw new Error("No pages generated");
   }
 
-  emit(writer, "generation", {
-    status: "generating",
-    pages: pages.map((page: any) => ({
-      id: page.id,
-      name: page.name,
-      done: false
-    }))
-  }, { id: "gen-card" })
+  emit(
+    writer,
+    "generation",
+    {
+      status: "generating",
+      pages: pages.map((page: any) => ({
+        id: page.id,
+        name: page.name,
+        done: false,
+      })),
+    },
+    { id: "gen-card" },
+  );
 
-  emit(writer, "pages-skeleton", {
-    pages: pages.map((page: any) => ({
-      id: page.id,
-      name: page.name,
-      rootStyles: page.rootStyles,
-      htmlContent: "",
-      isLoading: true
-    }))
-  }, { transient: true });
+  emit(
+    writer,
+    "pages-skeleton",
+    {
+      pages: pages.map((page: any) => ({
+        id: page.id,
+        name: page.name,
+        rootStyles: page.rootStyles,
+        htmlContent: "",
+        isLoading: true,
+      })),
+    },
+    { transient: true },
+  );
 
-  
+  const generationPages: { name: string; htmlContent: string }[] = ([] = [
+    ...(existingPages?.map((page: any) => ({
+      name: page.name,
+      htmlContent: page.htmlContent,
+    })) || []),
+  ]);
+
+  for (const page of pages) {
+    checkAbort();
+
+    emit(
+      writer,
+      "generation",
+      {
+        status: "generating",
+        currentPageId: page.id,
+        pages: pages.map((page: any) => ({
+          id: page.id,
+          name: page.name,
+          done: generationPages.some((gp: any) => gp.name === page.name),
+        })),
+      },
+      { id: "gen-card" },
+    );
+
+    const previousPagesContext =
+      generationPages.length > 0
+        ? generationPages
+            .slice(-2)
+            .map((p) => `<!--${p.name}-->\n${p.htmlContent}`)
+            .join("\n\n")
+        : "No previous pages";
+
+    const result = await insforge.ai.chat.completions.create({
+      model: "google/gemini-3.1-pro-preview",
+      messages: [
+        {
+          role: "system",
+          content: WEB_GENERATION_PROMPT,
+        },
+        {
+          role: "user",
+          content: `
+ GENERATE HTML FOR THE FOLLOWING PAGE:
+- Page Name: ${page.name}
+- Page Purpose: ${page.purpose}
+- Visual Description: ${page.visualDescription}
+- Theme Variables for this page (already injected in :root — reference via var(), do NOT redeclare):
+${page.rootStyles}
+- Context from previous pages : ${previousPagesContext}
+
+    CRITICAL REQUIREMENTS:
+    1. STYLE PRIORITY: Follow the "Visual Description" above as the ultimate source of truth.
+    2. OUTPUT FORMAT: Generate ONLY raw HTML markup. Start exactly with <div. Do not include \`\`\`html or any markdown wrappers.
+    CRITICAL:
+        1. Generate ONLY raw HTML markup production-ready responsive web page using Tailwind CSS for layout spacing, typography, shadows, etc.
+        2. **All content must be inside a single root <div> that controls the layout.**
+            - No overflow classes on the root.
+            - All scrollable content must be in inner containers with hidden scrollbars: [&::-webkit-scrollbar]:hidden scrollbar-none
+        3. ***Important*** For absolute overlays (maps, modals, etc.):**
+            - Use \`relative w-full h-screen\` on the top div of the overlay.
+        4. ***Important*** For regular content:**
+            - Use \`w-full h-full min-h-screen\` on the top div.
+        5. ***Important*** Do not use h-screen on inner content unless absolutely required.**
+            - Height must grow with content; content must be fully visible inside an iframe.
+        6. **For z-index layering:**
+            - Ensure absolute elements do not block other content unnecessarily.
+        7. **Output raw HTML only, starting with <div>.**
+            - Do not include markdown, comments, <html>, <body>, or <head>.
+        8. **Hardcode a style only if a theme variable is not needed for that element.**
+        9. **Ensure iframe-friendly rendering:**
+            - All elements must contribute to the final scrollHeight so your parent iframe can correctly resize.
+        Generate the complete, production-ready HTML for "${page.name}" now:`.trim(),
+        },
+      ],
+      webSearch: { enabled: false },
+      maxTokens: 30000,
+    });
+
+    let htmlContent = result.choices[0].message.content ?? "";
+    const match = htmlContent.match(/<div[\s\S]*<\/div>/);
+    htmlContent = match ? match[0] : htmlContent;
+    htmlContent = htmlContent.replace(/```/g, "");
+
+    const { data: savedPage, error } = await insforge.database
+      .from("pages")
+      .insert([
+        {
+          projectId,
+          name: page.name,
+          rootStyles: page.rootStyles,
+          htmlContent,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) console.log(error, "Page failed to save");
+
+    generationPages.push({
+      name: page.name,
+      htmlContent: htmlContent,
+    });
+
+    emit(
+      writer,
+      "generation",
+      {
+        status: "generating",
+        currentPageId: page.id,
+        pages: pages.map((page: any) => ({
+          id: page.id,
+          name: page.name,
+          done: generationPages.some((gp: any) => gp.name === page.name),
+        })),
+      },
+      { id: "gen-card" },
+    );
+
+    emit(
+      writer,
+      "page-created",
+      {
+        tempId: page.id,
+        page: {
+          id: savedPage.id,
+          name: savedPage.name,
+          rootStyles: savedPage.rootStyles,
+          htmlContent: savedPage.htmlContent,
+          isLoading: false,
+        },
+      },
+      { transient: true },
+    );
+  }
+
+  emit(
+    writer,
+    "generation",
+    {
+      status: "complete",
+      pages: pages.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        done: true,
+      })),
+    },
+    { id: "gen-card" },
+  );
+
+  const summaryResult = await insforge.ai.chat.completions.create({
+    model: "google/gemini-2.5-flash-lite",
+    messages: [
+      {
+        role: "system",
+        content: `You are Sleek, an AI web design agent. You just finished building pages.
+Write 1-2 sentences in first person. Natural, confident. No questions. No "let me know".`,
+      },
+      {
+        role: "user",
+        content: `Designed: ${pages.map((p: any) => p.name).join(", ")} for: "${latestUserMessage}". Summarize briefly.`,
+      },
+    ],
+    stream: true,
+    webSearch: { enabled: false },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -280,7 +456,7 @@ export async function POST(request: NextRequest) {
               },
             );
 
-            genCardEmitted = true
+            genCardEmitted = true;
 
             const analysisResult = await insforge.ai.chat.completions.create({
               model: "anthropic/claude-sonnet-4.5",
@@ -329,13 +505,14 @@ export async function POST(request: NextRequest) {
             let analysis: any;
             const analysisText =
               analysisResult.choices[0].message.content || "{}";
-              
+
             try {
-              const jsonStart = analysisText.indexOf('{');
-              const jsonEnd = analysisText.lastIndexOf('}');
-              if (jsonStart === -1 || jsonEnd === -1) throw new Error("No JSON object found");
+              const jsonStart = analysisText.indexOf("{");
+              const jsonEnd = analysisText.lastIndexOf("}");
+              if (jsonStart === -1 || jsonEnd === -1)
+                throw new Error("No JSON object found");
               const cleanJson = analysisText.substring(jsonStart, jsonEnd + 1);
-              analysis = JSON.parse(cleanJson)
+              analysis = JSON.parse(cleanJson);
             } catch (error) {
               console.log("Analysis error", error);
               throw new Error("Failed to parse json output");
@@ -352,7 +529,7 @@ export async function POST(request: NextRequest) {
               //   analysis,
               //   checkAbort,
               // })
-              return
+              return;
             }
 
             checkAbort();
@@ -370,12 +547,17 @@ export async function POST(request: NextRequest) {
           console.log(error);
           if (error instanceof AbortError) {
             if (genCardEmitted) {
-              emit(writer, "generation", { status: "canceled" }, {
-                id: "gen-card"
-              })
-              writer.write({ type: "abort", })
+              emit(
+                writer,
+                "generation",
+                { status: "canceled" },
+                {
+                  id: "gen-card",
+                },
+              );
+              writer.write({ type: "abort" });
             }
-            return
+            return;
           }
         }
       },
