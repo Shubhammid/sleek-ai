@@ -40,6 +40,44 @@ const emit = (
   });
 };
 
+async function runGenerationWorker({
+  insforge,
+  writer,
+  projectId,
+  analysis,
+  existingPages,
+  latestUserMessage,
+  checkAbort,
+}: any) {
+  const { pages } = analysis;
+  console.log(pages?.length, pages, "pages")
+
+  if (!analysis || !pages || pages?.length === 0) {
+    throw new Error("No pages generated");
+  }
+
+  emit(writer, "generation", {
+    status: "generating",
+    pages: pages.map((page: any) => ({
+      id: page.id,
+      name: page.name,
+      done: false
+    }))
+  }, { id: "gen-card" })
+
+  emit(writer, "pages-skeleton", {
+    pages: pages.map((page: any) => ({
+      id: page.id,
+      name: page.name,
+      rootStyles: page.rootStyles,
+      htmlContent: "",
+      isLoading: true
+    }))
+  }, { transient: true });
+
+  
+}
+
 export async function POST(request: NextRequest) {
   const { signal } = request;
   try {
@@ -140,6 +178,7 @@ export async function POST(request: NextRequest) {
     const uiStream = createUIMessageStream({
       generateId: generateId,
       async execute({ writer }) {
+        let genCardEmitted = false;
         try {
           if (project?.title) {
             emit(
@@ -241,6 +280,8 @@ export async function POST(request: NextRequest) {
               },
             );
 
+            genCardEmitted = true
+
             const analysisResult = await insforge.ai.chat.completions.create({
               model: "anthropic/claude-sonnet-4.5",
               messages: [
@@ -300,10 +341,42 @@ export async function POST(request: NextRequest) {
               throw new Error("Failed to parse json output");
             }
 
+            if (isRegen && selectedPageId) {
+              checkAbort();
+              // await runRegenerateWorker({
+              //   insforge,
+              //   writer,
+              //   projectId,
+              //   selectedPage,
+              //   latestUserMessage,
+              //   analysis,
+              //   checkAbort,
+              // })
+              return
+            }
 
+            checkAbort();
+            await runGenerationWorker({
+              insforge,
+              writer,
+              projectId,
+              analysis,
+              existingPages,
+              latestUserMessage,
+              checkAbort,
+            });
           }
         } catch (error) {
           console.log(error);
+          if (error instanceof AbortError) {
+            if (genCardEmitted) {
+              emit(writer, "generation", { status: "canceled" }, {
+                id: "gen-card"
+              })
+              writer.write({ type: "abort", })
+            }
+            return
+          }
         }
       },
     });
